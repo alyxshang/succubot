@@ -12,6 +12,11 @@ pub mod modules;
 /// to catch and handle errors.
 pub use modules::err::*;
 
+/// Exporting the function
+/// to make creating a new bot
+/// easy.
+pub use modules::bot::*;
+
 /// Re-exporting the module that
 /// handles parsing any 
 /// received messages.

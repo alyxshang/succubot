@@ -8,6 +8,11 @@ Licensed under the FSL v1.
 /// to catch and handle errors.
 pub mod err;
 
+/// Exporting the function
+/// to make creating a new bot
+/// easy.
+pub mod bot;
+
 /// Exporting the module that
 /// handles parsing any 
 /// received messages.
