@@ -3,15 +3,18 @@ Discord Oxide by Alyx Shang.
 Licensed under the FSL v1.
 */
 
-use super::err::DiscordOxideErr;
+use super::units::CommandType;
 
+#[derive(Clone)]
 pub enum Intent{
 }
 
+#[derive(Clone)]
 pub struct BotCommand{
     pub name: String,
     pub description: String,
-    pub arguments: u64
+    pub arguments: u64,
+    pub command_type: CommandType
 }
 
 impl BotCommand {
@@ -19,12 +22,14 @@ impl BotCommand {
     pub fn new(
         name: &str,
         description: &str,
-        arguments: &u64
+        arguments: &u64,
+        command_type: &CommandType
     ) -> BotCommand{
         BotCommand{
             name: name.to_string(),
             description: description.to_string(),
-            arguments: *arguments
+            arguments: *arguments,
+            command_type: command_type.clone()
         }
     }
 }
@@ -47,21 +52,23 @@ impl Bot {
             name: name.to_string(),
             token: token.to_string(),
             commands: commands,
-            intents: *intents
+            intents: intents.to_vec()
         }
     }
 
     pub fn add_command(
-        &self,
+        &mut self,
         name: &str,
         description: &str,
         arguments: &u64,
+        command_type: &CommandType
     ) -> () {
         let cmd: BotCommand = BotCommand::new(
             name,
             description,
-            arguments
+            arguments,
+            command_type
         );
-        &self.push(cmd);
+        &self.commands.push(cmd);
     }
 }

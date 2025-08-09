@@ -14,6 +14,7 @@ use serde::Deserialize;
 /// An enum to store
 /// all possible types
 /// of commands received.
+#[derive(Clone)]
 pub enum CommandType{
     NakedWord,
     SlashCommand
@@ -71,6 +72,7 @@ pub struct IdentifyPayload{
 pub struct IdentifyInfo {
     pub token: String,
     pub intents: u64,
+    #[serde(rename(serialize = "properties"))]
     pub host_properties: HostProperties
 }
 

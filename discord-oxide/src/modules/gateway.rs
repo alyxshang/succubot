@@ -3,7 +3,6 @@ Discord Oxide by Alyx Shang.
 Licensed under the FSL v1.
 */
 
-use std::ops::DivAssign;
 use std::sync::Arc;
 
 use tokio::sync::Mutex;
@@ -82,8 +81,9 @@ pub fn generate_identify_payload(
 }
 
 pub async fn retrieve_heartbeat_interval(
-    websocket_stream: &mut WebSocketStream<MaybeTlsStream<TcpStream>>
+    ws_stream: Arc<Mutex<WebSocketStream<MaybeTlsStream<TcpStream>>>>
 ) -> Result<u64, DiscordOxideErr>{
+    let mut websocket_stream = ws_stream.lock().await;
     let hello_msg = match websocket_stream.next().await{
         Some(hello_msg) => hello_msg,
         None => return Err::<u64, DiscordOxideErr>(
@@ -131,19 +131,23 @@ pub async fn establish_gateway(
         )
     };
     println!("Connected to gateway");
+    let ws_arc = Arc::new(Mutex::new(ws_stream));
+    let ws_clone = Arc::clone(&ws_arc);
+    let ws_clone_two = Arc::clone(&ws_clone);
+    let ws_clone_three = Arc::clone(&ws_clone_two);
+    let ws_clone_four = Arc::clone(&ws_clone_three);
     let sequence = Arc::new(Mutex::new(None::<u64>));
-    let interval: u64 = match retrieve_heartbeat_interval(&mut ws_stream).await {
+    let interval: u64 = match retrieve_heartbeat_interval(ws_clone_three).await {
         Ok(interval) => interval,
         Err(e) => return Err::<(), DiscordOxideErr>(
             DiscordOxideErr::new(&e.to_string())
         )
     };
     println!("{:?}", interval);
-    let ws_arc = Arc::new(Mutex::new(ws_stream));
     let hb: () = match send_heartbeat(
         interval, 
         sequence, 
-        ws_arc
+        ws_clone
     ).await {
         Ok(_f) => {},
         Err(e) => return Err::<(), DiscordOxideErr>(
@@ -163,23 +167,32 @@ pub async fn establish_gateway(
     };
     let send_identify: () = match send_identify(
         &id_payload, 
-        ws_stream
+        ws_clone_two
     ).await {
         Ok(_send_identify) => {},
         Err(e) => return Err::<(), DiscordOxideErr>(
             DiscordOxideErr::new(&e.to_string())
         )
     };
-    while let Some(msg) = ws_stream.next().await {
-        let msg: Message = match msg{
-            Ok(msg) => msg,
-            Err(e) => return Err::<(), DiscordOxideErr>(
-                DiscordOxideErr::new(&e.to_string())
-            )
-        };
-        println!("{:?}", msg);
+   while let Some(msg) = ws_clone_four.lock().await.next().await {
+    let msg: Message = match msg{
+        Ok(msg) => msg,
+        Err(e) => return Err::<(), DiscordOxideErr>(
+            DiscordOxideErr::new(&e.to_string())
+        )
+    };
+    if let Message::Text(txt) = msg {
+        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&txt) {
+            if let Some(event_type) = json["t"].as_str() {
+                if event_type == "MESSAGE_CREATE" {
+                    let author = json["d"]["author"]["username"].as_str().unwrap_or("unknown");
+                    let content = json["d"]["content"].as_str().unwrap_or("");
+                    println!("{}: {}", author, content);
+                }
+            }
+        }
     }
-    Ok(())
+}    Ok(())
 }
 
 pub async fn send_heartbeat(
@@ -187,6 +200,7 @@ pub async fn send_heartbeat(
     seq: Arc<Mutex<Option<u64>>>,
     websocket_stream: Arc<Mutex<WebSocketStream<MaybeTlsStream<TcpStream>>>>
 ) -> Result<(), DiscordOxideErr>{
+    let ws_stream = Arc::clone(&websocket_stream);
     tokio::spawn(
         async move {
             loop{
@@ -210,15 +224,18 @@ pub async fn send_heartbeat(
                         DiscordOxideErr::new(&e.to_string())
                     )
                 };
-                let bytes: Utf8Bytes = Utf8Bytes::from(payload);
-                let send: () = match ws_stream.send(
+                let payload_clone = payload.clone();
+                let payload_clone_one = payload_clone.clone();
+                let bytes: Utf8Bytes = Utf8Bytes::from(payload_clone);
+                let _send: () = match ws_stream.send(
                     Message::Text(bytes)
                 ).await {
-                    Ok(feedback) => {},
+                    Ok(_feedback) => {},
                     Err(e) => return Err::<(), DiscordOxideErr>(
                         DiscordOxideErr::new(&e.to_string())
                     )
                 };
+                println!("{}", &payload_clone_one);
                 sleep(Duration::from_millis(heartbeat)).await;
             }
         }
@@ -228,14 +245,18 @@ pub async fn send_heartbeat(
 
 pub async fn send_identify(
     payload: &String,
-    websocket_stream: &mut WebSocketStream<MaybeTlsStream<TcpStream>>
+    websocket_stream: Arc<Mutex<WebSocketStream<MaybeTlsStream<TcpStream>>>>
 ) -> Result<(), DiscordOxideErr>{
-    let bytes: Utf8Bytes = Utf8Bytes::from(payload);
-    let send: () = match websocket_stream.send(Message::Text(bytes)).await {
+    let pl_clone = payload.clone();
+    let pl_clone_one = payload.clone();
+    let mut ws_stream = websocket_stream.lock().await;
+    let bytes: Utf8Bytes = Utf8Bytes::from(pl_clone);
+    let send: () = match ws_stream.send(Message::Text(bytes)).await {
         Ok(_send) => {},
         Err(e) => return Err::<(), DiscordOxideErr>(
             DiscordOxideErr::new(&e.to_string())
         )
     };
+    println!("{}", &pl_clone_one);
     Ok(send)
 }
